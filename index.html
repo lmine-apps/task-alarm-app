@@ -40,8 +40,18 @@
   ::selection{background:rgba(227,195,129,.28);color:#fff}
   .wrap{max-width:880px;margin:0 auto;padding:0 16px 90px}
 
+  /* ===== エルラボ＋へ戻る ===== */
+  .topbar{padding:20px 0 0}
+  .backlink{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;
+    border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted);
+    font-size:12px;letter-spacing:.05em;text-decoration:none;transition:.2s}
+  .backlink:hover{color:var(--gold-2);border-color:var(--line-2);background:rgba(227,195,129,.08)}
+  .backlink .bl-arrow{font-size:13px;line-height:1}
+  .backlink .bl-brand{font-family:var(--mincho);font-weight:700;letter-spacing:.06em}
+  .backlink .bl-plus{color:var(--gold-2);font-size:.85em;vertical-align:.15em;margin-left:1px}
+
   /* ===== ヒーロー ===== */
-  .hero{text-align:center;padding:46px 8px 34px}
+  .hero{text-align:center;padding:30px 8px 34px}
   .ornament{width:42px;height:1px;margin:0 auto 18px;
     background:linear-gradient(90deg,transparent,var(--gold-2),transparent);
     box-shadow:0 0 18px rgba(227,195,129,.45)}
@@ -195,7 +205,7 @@
   .alarmbox .btns{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
 
   @media(max-width:680px){
-    .hero{padding:34px 4px 26px}
+    .hero{padding:22px 4px 26px}
     .form{grid-template-columns:1fr}
     .form .times{justify-content:space-between}
     input[type=time]{flex:1}
@@ -208,6 +218,10 @@
 </head>
 <body>
 <div class="wrap">
+
+  <div class="topbar">
+    <a class="backlink" href="https://columns.l-mine.com/app/"><span class="bl-arrow">←</span><span><span class="bl-brand">エルラボ<span class="bl-plus">＋</span></span>にもどる</span></a>
+  </div>
 
   <header class="hero">
     <div class="ornament"></div>
