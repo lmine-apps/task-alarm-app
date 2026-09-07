@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>タスクアラーム</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --panel:#ffffff; --line:#e2e6ef; --text:#1f2937; --sub:#6b7280;
+    --accent:#3b6ef5; --accent-soft:#e8efff;
+    --todo:#8b93a5; --doing:#1a9e6b; --paused:#e08a1e; --done:#a0a7b5;
+    --danger:#d9534f; --shadow:0 1px 3px rgba(20,30,60,.08),0 6px 18px rgba(20,30,60,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI","Yu Gothic UI","Hiragino Sans",Meiryo,sans-serif;font-size:14px;line-height:1.6}
+  .wrap{max-width:860px;margin:0 auto;padding:16px 14px 80px}
+
+  /* ヘッダー */
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:19px;margin:0;letter-spacing:.02em}
+  .today{color:var(--sub);font-size:13px}
+  .clock{margin-left:auto;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;letter-spacing:.03em}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+
+  /* 通知バー */
+  #permBar{display:none;align-items:center;gap:10px;padding:10px 14px;margin-bottom:12px;
+    background:#fff7e6;border:1px solid #f3d9a6;border-radius:10px;font-size:13px}
+  #permBar.show{display:flex}
+
+  /* タブ */
+  nav{display:flex;gap:6px;margin-bottom:12px}
+  nav button{border:1px solid var(--line);background:#fff;color:var(--sub);padding:7px 16px;
+    border-radius:999px;cursor:pointer;font-size:13px}
+  nav button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+
+  /* 入力フォーム */
+  .form{padding:14px;margin-bottom:14px;display:grid;
+    grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center}
+  .form .times{display:flex;align-items:center;gap:6px;white-space:nowrap}
+  input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit}
+  input[type=time]{width:110px}
+  input:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .btn{font:inherit;border:1px solid var(--line);background:#fff;color:var(--text);
+    padding:7px 14px;border-radius:8px;cursor:pointer}
+  .btn:hover{background:#f7f9fc}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn.primary:hover{background:#2f5ede}
+  .chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);white-space:nowrap;cursor:pointer}
+  .form .row2{grid-column:1/-1;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    border-top:1px dashed var(--line);padding-top:10px;margin-top:2px}
+
+  /* タスク行 */
+  .list{display:flex;flex-direction:column;gap:8px}
+  .task{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;position:relative;overflow:hidden}
+  .task::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--todo)}
+  .task.doing::before{background:var(--doing)}
+  .task.paused::before{background:var(--paused)}
+  .task.done::before{background:var(--done)}
+  .task.done{opacity:.6}
+  .task.now{border-color:var(--doing);box-shadow:0 0 0 2px rgba(26,158,107,.16),var(--shadow)}
+  .time{font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;min-width:104px;padding-top:1px}
+  .time small{display:block;font-size:11px;font-weight:400;color:var(--sub)}
+  .body{flex:1;min-width:0}
+  .title{font-size:15px;word-break:break-word}
+  .task.done .title{text-decoration:line-through}
+  .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;font-size:11px;color:var(--sub);align-items:center}
+  .badge{padding:1px 8px;border-radius:999px;border:1px solid var(--line);background:#fafbfd}
+  .badge.st-todo{color:var(--todo)}
+  .badge.st-doing{color:#fff;background:var(--doing);border-color:var(--doing)}
+  .badge.st-paused{color:#fff;background:var(--paused);border-color:var(--paused)}
+  .badge.st-done{color:#fff;background:var(--done);border-color:var(--done)}
+  .badge.carry{color:#b45309;background:#fff7e6;border-color:#f3d9a6}
+  .badge.keep{color:#4c1d95;background:#f3ebff;border-color:#ddd0f5}
+  .acts{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:290px}
+  .acts .btn{padding:5px 11px;font-size:12px}
+  .acts .btn.go{color:var(--doing);border-color:#bfe6d4}
+  .acts .btn.pause{color:var(--paused);border-color:#f5dfb4}
+  .acts .btn.done{color:#fff;background:var(--doing);border-color:var(--doing);font-weight:600}
+  .acts .btn.del{color:var(--danger);border-color:#f0c7c6}
+  .empty{padding:40px 16px;text-align:center;color:var(--sub)}
+
+  /* 集計 */
+  .summary{display:flex;gap:16px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--sub);flex-wrap:wrap}
+  .summary b{color:var(--text);font-size:15px;font-variant-numeric:tabular-nums}
+
+  /* 設定 */
+  .setrow{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .setrow:last-child{border-bottom:none}
+  .setrow label:first-child{min-width:190px;font-size:13px}
+  .hint{padding:12px 14px;font-size:12px;color:var(--sub);background:#fafbfd;border-radius:0 0 12px 12px}
+
+  /* 履歴 */
+  .daygroup{margin-bottom:14px}
+  .dayhead{font-size:13px;color:var(--sub);margin:0 0 6px 2px}
+
+  /* アラームモーダル */
+  #alarm{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;
+    align-items:center;justify-content:center;padding:16px}
+  #alarm.show{display:flex}
+  .alarmbox{background:#fff;border-radius:16px;padding:26px 24px;max-width:420px;width:100%;
+    text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:pop .25s ease}
+  @keyframes pop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+  .alarmbox .ico{font-size:40px;animation:ring 1s infinite}
+  @keyframes ring{0%,100%{transform:rotate(0)}25%{transform:rotate(12deg)}75%{transform:rotate(-12deg)}}
+  .alarmbox .kind{color:var(--sub);font-size:13px;margin-top:6px}
+  .alarmbox .at{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;margin:2px 0}
+  .alarmbox .what{font-size:17px;margin:8px 0 20px;word-break:break-word}
+  .alarmbox .btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+  @media(max-width:680px){
+    .form{grid-template-columns:1fr}
+    .task{flex-wrap:wrap}
+    .acts{max-width:none;width:100%;justify-content:flex-start}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>⏰ タスクアラーム</h1>
+      <div class="today" id="todayLabel"></div>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+
+  <div id="permBar">
+    <span>🔔 デスクトップ通知がまだ許可されていません。</span>
+    <button class="btn primary" id="permBtn">通知を許可する</button>
+    <button class="btn" id="testBtn">音をテスト</button>
+  </div>
+
+  <nav>
+    <button data-tab="today" class="on">今日</button>
+    <button data-tab="history">履歴</button>
+    <button data-tab="settings">設定</button>
+  </nav>
+
+  <!-- ===== 今日 ===== -->
+  <section id="tab-today">
+    <div class="card form">
+      <div class="times">
+        <input type="time" id="fStart" step="300">
+        <span style="color:var(--sub)">〜</span>
+        <input type="time" id="fEnd" step="300">
+      </div>
+      <span></span>
+      <input type="text" id="fTitle" placeholder="やること（例：ブログ執筆）" maxlength="120">
+      <button class="btn primary" id="addBtn">追加</button>
+      <div class="row2">
+        <label class="chk"><input type="checkbox" id="fKeep"> 毎日くり返す（ずっと残す）</label>
+        <label class="chk"><input type="checkbox" id="fAlarm" checked> アラームを鳴らす</label>
+        <span style="font-size:12px;color:var(--sub)">終了時刻は空でもOK</span>
+      </div>
+    </div>
+
+    <div class="card summary" id="summary"></div>
+    <div class="list" id="todayList"></div>
+  </section>
+
+  <!-- ===== 履歴 ===== -->
+  <section id="tab-history" hidden>
+    <div id="historyList"></div>
+  </section>
+
+  <!-- ===== 設定 ===== -->
+  <section id="tab-settings" hidden>
+    <div class="card">
+      <div class="setrow">
+        <label for="sPre">開始の何分前に予告通知</label>
+        <select id="sPre">
+          <option value="0">予告なし</option>
+          <option value="1">1分前</option>
+          <option value="3">3分前</option>
+          <option value="5">5分前</option>
+          <option value="10">10分前</option>
+          <option value="15">15分前</option>
+        </select>
+      </div>
+      <div class="setrow">
+        <label for="sEndAlarm">終了時刻にも鳴らす</label>
+        <input type="checkbox" id="sEndAlarm">
+      </div>
+      <div class="setrow">
+        <label for="sSound">アラーム音</label>
+        <select id="sSound">
+          <option value="bell">ベル（やわらか）</option>
+          <option value="beep">ピピッ（電子音）</option>
+          <option value="chime">チャイム（3音）</option>
+          <option value="none">音なし（通知だけ）</option>
+        </select>
+        <button class="btn" id="soundTest">試聴</button>
+      </div>
+      <div class="setrow">
+        <label for="sVol">音量</label>
+        <input type="range" id="sVol" min="0" max="100" step="5" style="flex:1;max-width:220px">
+        <span id="volLabel" style="color:var(--sub);font-size:13px"></span>
+      </div>
+      <div class="setrow">
+        <label for="sRepeat">鳴らす長さ</label>
+        <select id="sRepeat">
+          <option value="1">1回</option>
+          <option value="3">3回くり返す</option>
+          <option value="6">6回くり返す</option>
+          <option value="999">停止するまで鳴らし続ける</option>
+        </select>
+      </div>
+      <div class="setrow">
+        <label for="sSnooze">スヌーズ間隔</label>
+        <select id="sSnooze">
+          <option value="3">3分</option>
+          <option value="5">5分</option>
+          <option value="10">10分</option>
+        </select>
+      </div>
+      <div class="setrow">
+        <label for="sAutoCarry">未完了を翌日に持ち越す</label>
+        <input type="checkbox" id="sAutoCarry">
+      </div>
+      <div class="setrow">
+        <label>データ</label>
+        <button class="btn" id="exportBtn">バックアップ書き出し</button>
+        <button class="btn" id="importBtn">読み込み</button>
+        <input type="file" id="importFile" accept="application/json" hidden>
+        <button class="btn del" id="clearDone" style="color:var(--danger);border-color:#f0c7c6">完了済み履歴を削除</button>
+      </div>
+      <div class="hint">
+        ※ アラームは<b>このタブが開いている間だけ</b>動きます（最小化・裏に回すのはOK、閉じるとNG）。<br>
+        ※ ブラウザによっては、はじめに画面のどこかを1回クリックしないと音が出ない仕様になっています。<br>
+        ※ データはこのPCのブラウザ内（localStorage）にのみ保存されます。
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- アラーム -->
+<div id="alarm">
+  <div class="alarmbox">
+    <div class="ico">🔔</div>
+    <div class="kind" id="alarmKind"></div>
+    <div class="at" id="alarmAt"></div>
+    <div class="what" id="alarmWhat"></div>
+    <div class="btns">
+      <button class="btn primary" id="alarmStart">開始する</button>
+      <button class="btn" id="alarmSnooze">スヌーズ</button>
+      <button class="btn" id="alarmStop">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ 保存 ============ */
+const KEY_T = 'ta_tasks', KEY_S = 'ta_settings', KEY_D = 'ta_lastday';
+const DEF = { pre:5, endAlarm:false, sound:'bell', vol:60, repeat:3, snooze:5, autoCarry:true };
+
+let tasks = load(KEY_T, []);
+let cfg   = Object.assign({}, DEF, load(KEY_S, {}));
+
+function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
+function saveTasks(){ localStorage.setItem(KEY_T, JSON.stringify(tasks)); }
+function saveCfg(){ localStorage.setItem(KEY_S, JSON.stringify(cfg)); }
+
+/* ============ 日付ユーティリティ ============ */
+const pad = n => String(n).padStart(2,'0');
+function ymd(d=new Date()){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function hm(d=new Date()){ return pad(d.getHours())+':'+pad(d.getMinutes()); }
+function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
+function jpDate(s){
+  const [y,m,d] = s.split('-').map(Number);
+  const w = ['日','月','火','水','木','金','土'][new Date(y,m-1,d).getDay()];
+  return `${y}年${m}月${d}日(${w})`;
+}
+function daysBetween(a,b){
+  return Math.round((new Date(b+'T00:00') - new Date(a+'T00:00')) / 86400000);
+}
+
+/* ============ 繰り越し ============ */
+function rollover(){
+  const today = ymd();
+  let changed = false;
+  const todayKeeps = new Set(tasks.filter(t=>t.date===today && t.keepId).map(t=>t.keepId));
+
+  tasks.forEach(t=>{
+    if(t.date >= today) return;
+    if(t.status === 'done'){
+      // 完了したくり返しタスク → 今日の分を新しく作る
+      if(t.keepId && !todayKeeps.has(t.keepId)){
+        todayKeeps.add(t.keepId);
+        tasks.push({ id:uid(), keepId:t.keepId, date:today, start:t.start, end:t.end,
+          title:t.title, status:'todo', alarm:t.alarm, origin:today, fired:{} });
+        changed = true;
+      }
+    }else{
+      // 未完了 → 持ち越し
+      if(cfg.autoCarry){
+        if(t.keepId && todayKeeps.has(t.keepId)){ return; }
+        if(t.keepId) todayKeeps.add(t.keepId);
+        t.date = today;
+        t.fired = {};
+        changed = true;
+      }
+    }
+  });
+  if(changed) saveTasks();
+  localStorage.setItem(KEY_D, today);
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ============ 描画 ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ST = { todo:'未着手', doing:'進行中', paused:'中断', done:'完了' };
+
+function render(){
+  const today = ymd();
+  $('#todayLabel').textContent = jpDate(today);
+
+  const list = tasks.filter(t=>t.date===today).sort(sortTask);
+  const box = $('#todayList');
+
+  if(!list.length){
+    box.innerHTML = '<div class="card empty">今日のタスクはまだありません。<br>上のフォームから追加してください。</div>';
+  }else{
+    box.innerHTML = list.map(taskHTML).join('');
+  }
+
+  // 集計
+  const done = list.filter(t=>t.status==='done').length;
+  const carried = list.filter(t=>t.origin && t.origin < today).length;
+  $('#summary').innerHTML =
+    `<span>今日のタスク <b>${list.length}</b> 件</span>` +
+    `<span>完了 <b>${done}</b> / 残り <b>${list.length-done}</b></span>` +
+    (carried ? `<span>持ち越し <b>${carried}</b> 件</span>` : '');
+
+  renderHistory();
+}
+
+function sortTask(a,b){
+  const am = toMin(a.start), bm = toMin(b.start);
+  if(am === null && bm === null) return 0;
+  if(am === null) return 1;
+  if(bm === null) return -1;
+  return am - bm;
+}
+
+function taskHTML(t){
+  const cur = nowMin();
+  const s = toMin(t.start), e = toMin(t.end);
+  const isNow = t.status!=='done' && s!==null && cur>=s && (e===null ? cur < s+60 : cur < e);
+  const carryDays = t.origin ? daysBetween(t.origin, t.date) : 0;
+
+  const badges = [`<span class="badge st-${t.status}">${ST[t.status]}</span>`];
+  if(carryDays > 0) badges.push(`<span class="badge carry">📅 ${carryDays}日持ち越し</span>`);
+  if(t.keepId)      badges.push(`<span class="badge keep">🔁 毎日</span>`);
+  if(!t.alarm)      badges.push(`<span class="badge">🔕 通知なし</span>`);
+
+  let acts = '';
+  if(t.status === 'todo')        acts = `<button class="btn go" data-act="doing">▶ 開始</button>`;
+  else if(t.status === 'doing')  acts = `<button class="btn pause" data-act="paused">⏸ 中断</button>`;
+  else if(t.status === 'paused') acts = `<button class="btn go" data-act="doing">▶ 継続</button>`;
+  if(t.status !== 'done') acts += `<button class="btn done" data-act="done">✓ 完了</button>`;
+  else                    acts += `<button class="btn" data-act="todo">↩ 戻す</button>`;
+  acts += `<button class="btn" data-act="edit">✎</button><button class="btn del" data-act="del">🗑</button>`;
+
+  return `<div class="card task ${t.status}${isNow?' now':''}" data-id="${t.id}">
+    <div class="time">${t.start || '--:--'}<small>${t.end ? '〜'+t.end : '　'}</small></div>
+    <div class="body">
+      <div class="title">${esc(t.title)}</div>
+      <div class="meta">${badges.join('')}</div>
+    </div>
+    <div class="acts">${acts}</div>
+  </div>`;
+}
+
+function renderHistory(){
+  const today = ymd();
+  const past = tasks.filter(t=>t.date < today);
+  const box = $('#historyList');
+  if(!past.length){ box.innerHTML = '<div class="card empty">履歴はまだありません。</div>'; return; }
+
+  const byDay = {};
+  past.forEach(t=>{ (byDay[t.date] ||= []).push(t); });
+
+  box.innerHTML = Object.keys(byDay).sort().reverse().slice(0,60).map(d=>{
+    const arr = byDay[d].sort(sortTask);
+    const done = arr.filter(t=>t.status==='done').length;
+    return `<div class="daygroup">
+      <div class="dayhead">${jpDate(d)}　完了 ${done}/${arr.length}</div>
+      <div class="list">${arr.map(t=>`<div class="card task ${t.status}">
+        <div class="time">${t.start||'--:--'}<small>${t.end?'〜'+t.end:'　'}</small></div>
+        <div class="body"><div class="title">${esc(t.title)}</div>
+          <div class="meta"><span class="badge st-${t.status}">${ST[t.status]}</span></div></div>
+      </div>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ 操作 ============ */
+$('#addBtn').addEventListener('click', addTask);
+$('#fTitle').addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(); });
+
+function addTask(){
+  const title = $('#fTitle').value.trim();
+  if(!title){ $('#fTitle').focus(); return; }
+  const start = $('#fStart').value, end = $('#fEnd').value;
+  if(start && end && toMin(end) < toMin(start)){
+    alert('終了時刻が開始時刻より前になっています。'); return;
+  }
+  const today = ymd();
+  tasks.push({
+    id: uid(),
+    keepId: $('#fKeep').checked ? uid() : null,
+    date: today, origin: today,
+    start, end, title,
+    status: 'todo',
+    alarm: $('#fAlarm').checked,
+    fired: {}
+  });
+  saveTasks();
+  $('#fTitle').value = '';
+  $('#fKeep').checked = false;
+  // 次の入力しやすいように、終了時刻を次の開始時刻へ
+  if(end){ $('#fStart').value = end; $('#fEnd').value = ''; }
+  render();
+  $('#fTitle').focus();
+  unlockAudio();
+}
+
+$('#todayList').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  const id = e.target.closest('.task').dataset.id;
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  const act = btn.dataset.act;
+
+  if(act === 'del'){
+    if(!confirm(`「${t.title}」を削除しますか？`)) return;
+    tasks = tasks.filter(x=>x.id!==id);
+  }else if(act === 'edit'){
+    const nt = prompt('内容', t.title); if(nt===null) return;
+    const ns = prompt('開始時刻 (HH:MM / 空欄可)', t.start||''); if(ns===null) return;
+    const ne = prompt('終了時刻 (HH:MM / 空欄可)', t.end||''); if(ne===null) return;
+    if(nt.trim()) t.title = nt.trim();
+    t.start = ns.trim(); t.end = ne.trim();
+    t.fired = {};
+  }else{
+    t.status = act;
+    if(act === 'done') t.doneAt = new Date().toISOString();
+  }
+  saveTasks(); render();
+});
+
+/* ============ タブ ============ */
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on', x===b));
+    ['today','history','settings'].forEach(n=>{
+      $('#tab-'+n).hidden = (n !== b.dataset.tab);
+    });
+  });
+});
+
+/* ============ 設定 ============ */
+function bindCfg(){
+  $('#sPre').value = cfg.pre;
+  $('#sEndAlarm').checked = cfg.endAlarm;
+  $('#sSound').value = cfg.sound;
+  $('#sVol').value = cfg.vol;
+  $('#volLabel').textContent = cfg.vol + '%';
+  $('#sRepeat').value = cfg.repeat;
+  $('#sSnooze').value = cfg.snooze;
+  $('#sAutoCarry').checked = cfg.autoCarry;
+}
+$('#sPre').onchange      = e => { cfg.pre = +e.target.value; saveCfg(); };
+$('#sEndAlarm').onchange = e => { cfg.endAlarm = e.target.checked; saveCfg(); };
+$('#sSound').onchange    = e => { cfg.sound = e.target.value; saveCfg(); };
+$('#sVol').oninput       = e => { cfg.vol = +e.target.value; $('#volLabel').textContent = cfg.vol+'%'; saveCfg(); };
+$('#sRepeat').onchange   = e => { cfg.repeat = +e.target.value; saveCfg(); };
+$('#sSnooze').onchange   = e => { cfg.snooze = +e.target.value; saveCfg(); };
+$('#sAutoCarry').onchange= e => { cfg.autoCarry = e.target.checked; saveCfg(); };
+$('#soundTest').onclick  = () => { unlockAudio(); playOnce(); };
+
+$('#exportBtn').onclick = ()=>{
+  const blob = new Blob([JSON.stringify({tasks, cfg}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `taskalarm-backup-${ymd()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$('#importBtn').onclick = ()=> $('#importFile').click();
+$('#importFile').onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      if(!Array.isArray(d.tasks)) throw 0;
+      if(!confirm('現在のデータを上書きします。よろしいですか？')) return;
+      tasks = d.tasks; cfg = Object.assign({}, DEF, d.cfg||{});
+      saveTasks(); saveCfg(); bindCfg(); rollover(); render();
+      alert('読み込みました。');
+    }catch(err){ alert('ファイルの形式が正しくありません。'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+};
+$('#clearDone').onclick = ()=>{
+  const today = ymd();
+  const n = tasks.filter(t=>t.date<today).length;
+  if(!n){ alert('削除する履歴はありません。'); return; }
+  if(!confirm(`過去の履歴 ${n} 件を削除します。よろしいですか？`)) return;
+  tasks = tasks.filter(t=>t.date>=today);
+  saveTasks(); render();
+};
+
+/* ============ 音 ============ */
+let ac = null;
+function unlockAudio(){
+  if(!ac){ try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } }
+  if(ac.state === 'suspended') ac.resume();
+}
+document.addEventListener('click', unlockAudio, {once:true});
+document.addEventListener('keydown', unlockAudio, {once:true});
+
+const PATTERN = {
+  bell:  [[880,0,.5],[1320,.05,.5]],
+  beep:  [[1046,0,.12],[1046,.18,.12],[1046,.36,.12]],
+  chime: [[523,0,.4],[659,.22,.4],[784,.44,.7]],
+};
+function playOnce(){
+  if(cfg.sound === 'none' || !ac || ac.state !== 'running') return;
+  const vol = cfg.vol/100 * .35;
+  (PATTERN[cfg.sound] || PATTERN.bell).forEach(([f, at, dur])=>{
+    const t0 = ac.currentTime + at;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = cfg.sound === 'beep' ? 'square' : 'sine';
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + .02);
+    g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0); o.stop(t0 + dur + .05);
+  });
+}
+let ringTimer = null, ringLeft = 0;
+function startRinging(){
+  stopRinging();
+  ringLeft = cfg.repeat;
+  playOnce(); ringLeft--;
+  if(ringLeft > 0){
+    ringTimer = setInterval(()=>{
+      if(ringLeft <= 0){ stopRinging(); return; }
+      playOnce(); ringLeft--;
+    }, 1600);
+  }
+}
+function stopRinging(){ if(ringTimer){ clearInterval(ringTimer); ringTimer = null; } }
+
+/* ============ 通知 ============ */
+function updatePermBar(){
+  const need = ('Notification' in window) && Notification.permission !== 'granted';
+  $('#permBar').classList.toggle('show', need);
+}
+$('#permBtn').onclick = async ()=>{
+  unlockAudio();
+  try{ await Notification.requestPermission(); }catch(e){}
+  updatePermBar();
+};
+$('#testBtn').onclick = ()=>{ unlockAudio(); playOnce(); notify('テスト通知', '音と通知のテストです'); };
+
+function notify(title, body){
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  try{
+    const n = new Notification(title, { body, tag:'task-alarm', renotify:true, requireInteraction:true });
+    n.onclick = ()=>{ window.focus(); n.close(); };
+  }catch(e){}
+}
+
+/* ============ アラーム判定 ============ */
+let current = null;   // 鳴っているタスク
+const snoozed = {};   // id+kind -> 再通知する分
+
+function tick(){
+  const d = new Date();
+  $('#clock').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  // 日付が変わったら繰り越し
+  if(localStorage.getItem(KEY_D) !== ymd()){ rollover(); render(); }
+
+  const today = ymd(), cur = nowMin();
+
+  tasks.filter(t=>t.date===today && t.alarm && t.status!=='done').forEach(t=>{
+    t.fired ||= {};
+    const s = toMin(t.start), e = toMin(t.end);
+
+    // 予告
+    if(cfg.pre > 0 && s !== null && !t.fired.pre && cur >= s - cfg.pre && cur < s){
+      t.fired.pre = 1; saveTasks();
+      fire(t, 'pre', `まもなく開始（${cfg.pre}分前）`, t.start);
+    }
+    // 開始
+    if(s !== null && !t.fired.start && cur >= s && cur < s + 30 && t.status === 'todo'){
+      t.fired.start = 1; saveTasks();
+      fire(t, 'start', '開始の時間です', t.start);
+    }
+    // 終了
+    if(cfg.endAlarm && e !== null && !t.fired.end && cur >= e && cur < e + 30){
+      t.fired.end = 1; saveTasks();
+      fire(t, 'end', '終了予定の時間です', t.end);
+    }
+    // スヌーズ
+    Object.keys(snoozed).forEach(k=>{
+      if(k.startsWith(t.id+'|') && cur >= snoozed[k]){
+        const kind = k.split('|')[1];
+        delete snoozed[k];
+        fire(t, kind, 'スヌーズ', t.start);
+      }
+    });
+  });
+
+  // 「進行中」表示の更新用に毎分だけ再描画
+  if(d.getSeconds() === 0) render();
+}
+
+function fire(t, kind, kindLabel, at){
+  current = { task:t, kind };
+  $('#alarmKind').textContent = kindLabel;
+  $('#alarmAt').textContent = at || '';
+  $('#alarmWhat').textContent = t.title;
+  $('#alarmStart').style.display = (t.status === 'todo') ? '' : 'none';
+  $('#alarm').classList.add('show');
+  startRinging();
+  notify(`⏰ ${t.start||''} ${t.title}`, kindLabel);
+}
+function closeAlarm(){ stopRinging(); $('#alarm').classList.remove('show'); current = null; }
+
+$('#alarmStop').onclick = closeAlarm;
+$('#alarmStart').onclick = ()=>{
+  if(current){ current.task.status = 'doing'; saveTasks(); render(); }
+  closeAlarm();
+};
+$('#alarmSnooze').onclick = ()=>{
+  if(current) snoozed[current.task.id+'|'+current.kind] = nowMin() + cfg.snooze;
+  closeAlarm();
+};
+
+/* ============ 起動 ============ */
+bindCfg();
+updatePermBar();
+rollover();
+$('#fStart').value = hm();
+render();
+setInterval(tick, 1000);
+tick();
+</script>
+</body>
+</html>
